@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthAI - Diagnostics Intelligents</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Loader -->
+    <div class="loader-container" id="loaderContainer">
+        <div class="loader"></div>
+    </div>
+    
+    <div class="app-container">
+        <header>
+            <h1><i class="bi bi-activity"></i> HealthAI</h1>
+            <p>Système intelligent de diagnostic médical basé sur les symptômes</p>
+        </header>
+        
+        <form method="POST" action="/" id="diagnosisForm">
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <i class="bi bi-list-check"></i> Sélection des symptômes
+                        </div>
+                        <div class="card-body">
+                            <div class="selected-symptoms" id="selectedSymptomsContainer">
+                                {% if result and result.symptoms %}
+                                    {% for symptom in result.symptoms %}
+                                        <div class="selected-symptom" data-symptom="{{ symptom }}">
+                                            {{ symptom }} <i class="bi bi-x-circle"></i>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">Sélectionnez vos symptômes ci-dessous</p>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="symptom-search">
+                                <input type="text" id="symptomSearch" placeholder="Rechercher un symptôme...">
+                                <i class="bi bi-search"></i>
+                            </div>
+                            
+                            <div class="symptom-list">
+                                {% for symptom in symptoms %}
+                                <div class="symptom-item" style="position: relative;">
+                                    <label>
+                                        <input type="checkbox" name="symptoms" value="{{ symptom }}">
+                                        {{ symptom.replace('_', ' ').capitalize() }}
+                                    </label>
+
+                                    {% set info = symptoms_dict.get(symptom.replace('_', ' ').capitalize()) %}
+                                    {% if info and info.url %}
+                                        <img src="{{ info.url }}" alt="Image" class="symptom-hover-image">
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary w-100" id="analyzeButton">
+                                    <i class="bi bi-search"></i> Analyser les symptômes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-8">
+                    {% if result %}
+                    <div class="result-section show" id="resultSection">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <i class="bi bi-clipboard-data"></i> Résultat du diagnostic
+                            </div>
+                            <div class="card-body">
+                                <h3 class="disease-title">{{ result.disease }}</h3>
+                                
+                                <div class="confidence-section">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Précision du diagnostic</span>
+                                        <span>{{ result.precision }}</span>
+                                    </div>
+                                    <div class="confidence-bar">
+                                        <div class="confidence-level" style="width: {{ result.precision }}"></div>
+                                    </div>
+                                </div>
+                                {% if result.description %}
+                                    <p>{{ result.description }}</p>
+                                {% endif %}
+                                
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> <strong>Avertissement:</strong> 
+                                    Ce diagnostic est fourni à titre indicatif uniquement. 
+                                    Veuillez consulter un professionnel de la santé pour un avis médical.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-section">
+                            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                                {% if result.medications %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="medications-tab" data-bs-toggle="tab" data-bs-target="#medications" type="button" role="tab" aria-controls="medications" aria-selected="true">
+                                        <i class="bi bi-capsule"></i> Médicaments
+                                    </button>
+                                </li>
+                                {% endif %}
+                                
+                                {% if result.precautions %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link {% if not result.medications %}active{% endif %}" id="precautions-tab" data-bs-toggle="tab" data-bs-target="#precautions" type="button" role="tab" aria-controls="precautions" aria-selected="false">
+                                        <i class="bi bi-shield-check"></i> Précautions
+                                    </button>
+                                </li>
+                                {% endif %}
+                                
+                                {% if result.diets %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link {% if not result.medications and not result.precautions %}active{% endif %}" id="diet-tab" data-bs-toggle="tab" data-bs-target="#diet" type="button" role="tab" aria-controls="diet" aria-selected="false">
+                                        <i class="bi bi-egg-fried"></i> Alimentation
+                                    </button>
+                                </li>
+                                {% endif %}
+                                
+                                {% if result.workout %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link {% if not result.medications and not result.precautions and not result.diets %}active{% endif %}" id="workout-tab" data-bs-toggle="tab" data-bs-target="#workout" type="button" role="tab" aria-controls="workout" aria-selected="false">
+                                        <i class="bi bi-heart-pulse"></i> Activités
+                                    </button>
+                                </li>
+                                {% endif %}
+                            </ul>
+                            
+                            <div class="tab-content" id="myTabContent">
+                                {% if result.medications %}
+                                <div class="tab-pane fade show active" id="medications" role="tabpanel" aria-labelledby="medications-tab">
+                                    <div class="pt-3">
+                                        <h5 class="mb-3">Médicaments recommandés</h5>
+                                        {% for medication in result.medications %}
+                                        <div class="info-item">
+                                            <div class="info-icon">
+                                                <i class="bi bi-capsule"></i>
+                                            </div>
+                                            <div class="info-content">
+                                                {{ medication }}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if result.precautions %}
+                                <div class="tab-pane fade {% if not result.medications %}show active{% endif %}" id="precautions" role="tabpanel" aria-labelledby="precautions-tab">
+                                    <div class="pt-3">
+                                        <h5 class="mb-3">Précautions à prendre</h5>
+                                        {% for precaution in result.precautions %}
+                                        <div class="info-item">
+                                            <div class="info-icon">
+                                                <i class="bi bi-shield-check"></i>
+                                            </div>
+                                            <div class="info-content">
+                                                {{ precaution }}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if result.diets %}
+                                <div class="tab-pane fade {% if not result.medications and not result.precautions %}show active{% endif %}" id="diet" role="tabpanel" aria-labelledby="diet-tab">
+                                    <div class="pt-3">
+                                        <h5 class="mb-3">Recommandations alimentaires</h5>
+                                        {% for diet in result.diets %}
+                                        <div class="info-item">
+                                            <div class="info-icon">
+                                                <i class="bi bi-egg-fried"></i>
+                                            </div>
+                                            <div class="info-content">
+                                                {{ diet }}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if result.workout %}
+                                <div class="tab-pane fade {% if not result.medications and not result.precautions and not result.diets %}show active{% endif %}" id="workout" role="tabpanel" aria-labelledby="workout-tab">
+                                    <div class="pt-3">
+                                        <h5 class="mb-3">Recommandations d'activité physique</h5>
+                                        {% for exercise in result.workout %}
+                                        <div class="info-item">
+                                            <div class="info-icon">
+                                                <i class="bi bi-heart-pulse"></i>
+                                            </div>
+                                            <div class="info-content">
+                                                {{ exercise }}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="description-card">
+                        <h4>Comment utiliser HealthAI?</h4>
+                        <p>1. Sélectionnez vos symptômes dans la liste à gauche</p>
+                        <p>2. Cliquez sur "Analyser les symptômes" pour obtenir un diagnostic</p>
+                        <p>3. Consultez les recommandations personnalisées basées sur votre diagnostic</p>
+                        <div class="alert alert-warning mt-3">
+                            <i class="bi bi-info-circle"></i> Pour des résultats plus précis, veuillez sélectionner au moins 3 symptômes.
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-shield-check"></i> Informations importantes
+                        </div>
+                        <div class="card-body">
+                            <p>HealthAI utilise l'intelligence artificielle pour analyser vos symptômes et suggérer des diagnostics possibles. Notre système se base sur des données médicales et des algorithmes d'apprentissage automatique pour vous fournir des informations pertinentes.</p>
+                            <p><strong>Attention :</strong> Cette application ne remplace pas un avis médical professionnel. En cas de symptômes graves ou persistants, consultez immédiatement un médecin.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    
+<!-- Chatbot à intégrer dans votre page HTML -->
+<!-- Bouton pour ouvrir le chatbot -->
+<button id="chatbotBtn">
+    <i class="bi bi-chat-dots"></i>
+</button>
+
+<!-- Fenêtre du chatbot -->
+<div id="chatbotBox">
+    <div id="chatbotHeader">
+        <span>Assistant HealthAI</span>
+        <button id="closeChatbot">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="chatbotBody"></div>
+    <div id="chatbotFooter">
+        <input type="text" id="chatbotInput" placeholder="Écrivez un message..." />
+        <button id="sendMessage">
+            <i class="bi bi-send"></i>
+        </button>
+    </div>
+</div>
+
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
